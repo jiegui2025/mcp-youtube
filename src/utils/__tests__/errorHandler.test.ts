@@ -75,6 +75,22 @@ describe("errorHandler", () => {
       });
     });
 
+    it("should not expose request configuration when no response data exists", () => {
+      const originalError = {
+        message: "Request failed",
+        config: { url: "https://example.test?key=SECRET_API_KEY" },
+      };
+      const youtubeApiError = new YouTubeApiError(
+        "YouTube API call failed",
+        originalError
+      );
+
+      const result = formatError(youtubeApiError);
+
+      expect(JSON.stringify(result)).not.toContain("SECRET_API_KEY");
+      expect(JSON.stringify(result)).not.toContain("config");
+    });
+
     it("should format a custom YouTubeApiError correctly", () => {
       const originalGoogleError = {
         response: {

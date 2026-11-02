@@ -2,8 +2,8 @@
 export class AppError extends Error {
   public readonly details: unknown;
 
-  constructor(message: string, details?: unknown) {
-    super(message);
+  constructor(message: string, details?: unknown, options?: ErrorOptions) {
+    super(message, options);
     this.name = this.constructor.name;
     this.details = details;
     Error.captureStackTrace(this, this.constructor);
@@ -14,11 +14,14 @@ export class AppError extends Error {
 export class YouTubeApiError extends AppError {
   constructor(message: string, originalError: unknown) {
     // Extract key details from the original Google API error
+    // Response data contains YouTube's structured error without the request
+    // configuration, which can contain the API key. Preserve the original
+    // error only as a non-enumerable cause for internal inspection.
     const details = hasResponseData(originalError)
       ? originalError.response.data
-      : originalError;
+      : undefined;
 
-    super(message, details);
+    super(message, details, { cause: originalError });
     this.name = "YouTubeApiError";
   }
 }

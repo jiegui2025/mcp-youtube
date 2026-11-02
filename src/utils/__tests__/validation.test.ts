@@ -91,6 +91,10 @@ describe("validation", () => {
       it("should invalidate a maxResults value that is too large", () => {
         expect(() => maxResultsSchema.parse(501)).toThrow(z.ZodError);
       });
+
+      it("should invalidate a fractional maxResults value", () => {
+        expect(() => maxResultsSchema.parse(1.5)).toThrow(z.ZodError);
+      });
     });
     describe("querySchema", () => {
       it("should validate a correct query string", () => {

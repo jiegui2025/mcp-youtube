@@ -191,6 +191,33 @@ describe("YoutubeService - batchFetchChannelStatistics", () => {
     expect(youtubeService.getApiCreditsUsed()).toBe(1);
   });
 
+  it("should redact API keys from partial batch failure logs", async () => {
+    const channelIds = Array.from(
+      { length: 51 },
+      (_, index) => `channel${index}`
+    );
+    const error = new Error(
+      "Request failed: https://youtube.googleapis.com?key=SECRET_API_KEY"
+    ) as Error & { config: { auth: string } };
+    error.config = { auth: "SECRET_API_KEY" };
+    mockChannelsList
+      .mockResolvedValueOnce({ data: { items: [{ id: "channel0" }] } })
+      .mockRejectedValueOnce(error);
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+    try {
+      await youtubeService.batchFetchChannelStatistics(channelIds);
+
+      expect(consoleSpy).toHaveBeenCalledTimes(1);
+      const loggedMessage = String(consoleSpy.mock.calls[0][0]);
+      expect(loggedMessage).toContain("key=[REDACTED]");
+      expect(loggedMessage).not.toContain("SECRET_API_KEY");
+      expect(consoleSpy.mock.calls[0]).toHaveLength(1);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   it("should throw an error if the API call fails", async () => {
     mockChannelsList.mockRejectedValueOnce(new Error("API Error"));
     await expect(

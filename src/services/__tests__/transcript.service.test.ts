@@ -130,7 +130,7 @@ describe("TranscriptService", () => {
       expect(result).toEqual(expectedSubtitles);
     });
 
-    it("should return an empty array if fetchTranscript call fails", async () => {
+    it("should return null without caching a failed fetch", async () => {
       cacheService.getOrSet.mockImplementation(async (key, operation) =>
         operation()
       );
@@ -142,7 +142,7 @@ describe("TranscriptService", () => {
         lang
       );
 
-      expect(result).toEqual([]);
+      expect(result).toBeNull();
     });
 
     it("should return data from cache without calling fetchTranscript", async () => {

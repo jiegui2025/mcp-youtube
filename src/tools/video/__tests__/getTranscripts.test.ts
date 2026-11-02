@@ -55,6 +55,17 @@ describe("GetTranscriptsTool", () => {
     expect(result.content[0].text).toContain("Transcript not available");
   });
 
+  it("should reject empty and oversized video ID batches", async () => {
+    const emptyResult = await tool.execute({ videoIds: [] });
+    const oversizedResult = await tool.execute({
+      videoIds: Array.from({ length: 51 }, (_, index) => `video${index}`),
+    });
+
+    expect(emptyResult.isError).toBe(true);
+    expect(oversizedResult.isError).toBe(true);
+    expect(mockTranscriptService.getTranscriptSegments).not.toHaveBeenCalled();
+  });
+
   it("should return a Zod validation error for invalid parameters", async () => {
     const invalidParams = { videoIds: [""] }; // videoId cannot be empty
     const result = await tool.execute(invalidParams);
