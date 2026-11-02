@@ -13,6 +13,7 @@ import type {
   ChannelAnalysisLog,
 } from "../../../types/niche.types"; // Added ChannelAnalysisLog
 import { youtube_v3 } from "googleapis";
+import { YouTubeApiError } from "../../../errors/api.errors";
 
 describe("isQuotaError", () => {
   it("should return true for error object with code 403", () => {
@@ -36,6 +37,30 @@ describe("isQuotaError", () => {
         { reason: "quotaExceeded", message: "Quota exceeded for service." },
       ],
     };
+    expect(isQuotaError(error)).toBe(true);
+  });
+
+  it("should detect quota errors wrapped in YouTubeApiError", () => {
+    const error = new YouTubeApiError("YouTube API call failed", {
+      response: {
+        data: {
+          error: {
+            code: 403,
+            errors: [{ reason: "quotaExceeded" }],
+          },
+        },
+      },
+    });
+
+    expect(isQuotaError(error)).toBe(true);
+  });
+
+  it("should detect quota errors preserved as an error cause", () => {
+    const error = new YouTubeApiError("YouTube API call failed", {
+      code: 403,
+      config: { url: "https://example.test?key=SECRET_API_KEY" },
+    });
+
     expect(isQuotaError(error)).toBe(true);
   });
 

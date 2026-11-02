@@ -10,20 +10,51 @@ export const MIN_OUTLIER_VIEW_COUNT = 1000;
 export const MIN_VIDEO_DURATION_SECONDS = 180;
 
 export function isQuotaError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const err = error as Record<string, unknown>; // Cast to a record for property access
+  const visited = new Set<object>();
 
-  if (err.code === 403) {
-    return true;
-  }
-  if (err.errors && Array.isArray(err.errors)) {
-    return err.errors.some(
-      (e: { reason: string }) => e.reason === "quotaExceeded"
-    );
-  }
-  return false;
+  const inspect = (value: unknown, depth: number): boolean => {
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      depth > 6 ||
+      visited.has(value)
+    ) {
+      return false;
+    }
+    visited.add(value);
+
+    const err = value as Record<string, unknown>;
+    if (err.code === 403) {
+      return true;
+    }
+    if (
+      Array.isArray(err.errors) &&
+      err.errors.some(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          "reason" in entry &&
+          (entry as Record<string, unknown>).reason === "quotaExceeded"
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      inspect(err.details, depth + 1) ||
+      inspect(err.cause, depth + 1) ||
+      inspect(err.error, depth + 1)
+    ) {
+      return true;
+    }
+
+    if (typeof err.response === "object" && err.response !== null) {
+      return inspect((err.response as Record<string, unknown>).data, depth + 1);
+    }
+    return false;
+  };
+
+  return inspect(error, 0);
 }
 
 export function calculateChannelAgePublishedAfter(

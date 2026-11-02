@@ -6,11 +6,14 @@ import {
 } from "../../utils/responseFormatter.js";
 import { videoIdSchema, languageSchema } from "../../utils/validation.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { mapWithConcurrency } from "../../utils/concurrency.js";
 
 export const getTranscriptsSchema = z.object({
   videoIds: z
     .array(videoIdSchema)
-    .describe("Array of YouTube video IDs to get transcripts for"),
+    .min(1, "Video IDs array must contain at least 1 element")
+    .max(50, "Video IDs array cannot contain more than 50 elements")
+    .describe("Array of up to 50 YouTube video IDs to get transcripts for"),
   lang: languageSchema
     .default("en")
     .describe(
@@ -37,14 +40,13 @@ export class GetTranscriptsTool extends BaseTool<typeof getTranscriptsSchema> {
   ): Promise<CallToolResult> {
     const { videoIds, lang, format } = params;
 
-    const transcriptPromises = videoIds.map((videoId) =>
+    const transcripts = await mapWithConcurrency(videoIds, (videoId) =>
       this.container.transcriptService.getTranscriptSegments(
         videoId,
         lang,
         format
       )
     );
-    const transcripts = await Promise.all(transcriptPromises);
     const result = formatVideoMap(videoIds, transcripts);
 
     return formatSuccess(result);

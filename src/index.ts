@@ -10,6 +10,7 @@ import { initializeContainer } from "./container.js";
 import { disconnectFromDatabase } from "./services/database.service.js";
 import pkg from "../package.json" with { type: "json" };
 import { createMcpServer } from "./server.js";
+import { getSafeErrorMessage } from "./utils/errorLogger.js";
 
 export async function runServer(config: z.infer<typeof configSchema>) {
   const container = initializeContainer({
@@ -47,7 +48,7 @@ async function main() {
 // By default, the server starts with stdio transport
 if (process.env.NODE_ENV !== "test") {
   main().catch((error) => {
-    console.error("Server error:", error);
+    console.error(`Server error: ${getSafeErrorMessage(error)}`);
     process.exit(1);
   });
 }

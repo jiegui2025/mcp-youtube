@@ -17,7 +17,7 @@ export const validateParams = <T>(params: T, schema: z.ZodSchema<T>): T => {
 // Common validation schemas
 export const videoIdSchema = z.string().min(1, "Video ID cannot be empty");
 export const channelIdSchema = z.string().min(1, "Channel ID cannot be empty");
-export const maxResultsSchema = z.number().min(1).max(500).optional();
+export const maxResultsSchema = z.number().int().min(1).max(500).optional();
 export const querySchema = z.string().min(1, "Query cannot be empty");
 export const languageSchema = z.string().optional();
 export const regionCodeSchema = z

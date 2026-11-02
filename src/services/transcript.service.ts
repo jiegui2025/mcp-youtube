@@ -1,6 +1,7 @@
 import { fetchTranscript, TranscriptResult } from "youtube-transcript-plus";
 import { CacheService } from "./cache.service.js";
 import { CACHE_TTLS, CACHE_COLLECTIONS } from "../config/cache.config.js";
+import { getSafeErrorMessage } from "../utils/errorLogger.js";
 
 // Local Subtitle type matching the shape expected by the rest of the codebase.
 interface Subtitle {
@@ -41,13 +42,13 @@ export class TranscriptService {
   private async fetchAndCacheRawTranscript(
     videoId: string,
     lang: string = "en"
-  ): Promise<Subtitle[]> {
+  ): Promise<Subtitle[] | null> {
     const cacheKey = this.cacheService.createOperationKey("getTranscript", {
       videoId,
       lang,
     });
 
-    const operation = async (): Promise<Subtitle[]> => {
+    const operation = async (): Promise<Subtitle[] | null> => {
       try {
         const transcript = (await fetchTranscript(videoId, {
           lang,
@@ -63,14 +64,14 @@ export class TranscriptService {
         );
       } catch (error) {
         console.error(
-          `[TranscriptService] Failed to fetch transcript for ${videoId} (lang: ${lang}):`,
-          error instanceof Error ? error.message : error
+          `[TranscriptService] Failed to fetch transcript for ${videoId} (lang: ${lang}): ${getSafeErrorMessage(error)}`
         );
-        return [];
+        // CacheService does not cache null, so transient failures are retried.
+        return null;
       }
     };
 
-    return this.cacheService.getOrSet<Subtitle[]>(
+    return this.cacheService.getOrSet<Subtitle[] | null>(
       cacheKey,
       operation,
       CACHE_TTLS.STATIC,

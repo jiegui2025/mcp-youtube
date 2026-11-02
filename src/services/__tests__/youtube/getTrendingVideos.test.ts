@@ -154,6 +154,34 @@ describe("YoutubeService.getTrendingVideos", () => {
     });
   });
 
+  it("should paginate requests when maxResults exceeds 50", async () => {
+    const createItems = (count: number, offset: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `video${offset + index}`,
+        snippet: {},
+        statistics: {},
+        contentDetails: {},
+      }));
+
+    mockVideosList
+      .mockResolvedValueOnce({
+        data: { items: createItems(50, 0), nextPageToken: "next-page" },
+      })
+      .mockResolvedValueOnce({
+        data: { items: createItems(10, 50) },
+      });
+
+    const result = await videoManagement.getTrendingVideos({ maxResults: 60 });
+
+    expect(result).toHaveLength(60);
+    expect(mockVideosList).toHaveBeenCalledTimes(2);
+    expect(mockVideosList.mock.calls[0][0].maxResults).toBe(50);
+    expect(mockVideosList).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ maxResults: 10, pageToken: "next-page" })
+    );
+  });
+
   it("should throw an error if youtube.videos.list throws an error", async () => {
     const errorMessage = "Failed to fetch trending videos from API";
     mockVideosList.mockRejectedValue(new Error(errorMessage));

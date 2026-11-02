@@ -89,6 +89,20 @@ describe("GetVideoDetailsTool", () => {
     expect(result.content[0].text).toContain("Video not found.");
   });
 
+  it("should reject empty and oversized video ID batches", async () => {
+    const emptyResult = await tool.execute({ videoIds: [] });
+    const oversizedResult = await tool.execute({
+      videoIds: Array.from({ length: 51 }, (_, index) => `video${index}`),
+    });
+
+    expect(emptyResult.isError).toBe(true);
+    expect(oversizedResult.isError).toBe(true);
+    expect(oversizedResult.content[0].text).toContain(
+      "cannot contain more than 50"
+    );
+    expect(mockYoutubeService.getVideo).not.toHaveBeenCalled();
+  });
+
   it("should handle missing optional fields gracefully", async () => {
     const mockVideoDetails = {
       id: "testVideoId3MissingFields",

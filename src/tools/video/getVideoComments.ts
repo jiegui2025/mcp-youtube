@@ -11,6 +11,7 @@ export const getVideoCommentsSchema = z.object({
     .describe("The 11-character ID of the YouTube video."),
   maxResults: z
     .number()
+    .int()
     .min(1)
     .max(100)
     .default(20)
@@ -25,6 +26,7 @@ export const getVideoCommentsSchema = z.object({
     ),
   maxReplies: z
     .number()
+    .int()
     .min(0)
     .max(5)
     .default(0)

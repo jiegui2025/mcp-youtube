@@ -20,6 +20,7 @@ import type {
   LeanReply,
 } from "../types/youtube.js";
 import { GetVideoCommentsParams } from "../types/tools.js";
+import { getSafeErrorMessage } from "../utils/errorLogger.js";
 
 export interface VideoOptions {
   videoId: string;
@@ -200,6 +201,7 @@ export class YoutubeService {
           publishedAfter,
           recency,
           regionCode,
+          videoCategoryId,
         } = options;
 
         const results: youtube_v3.Schema$SearchResult[] = [];
@@ -238,6 +240,10 @@ export class YoutubeService {
 
           if (regionCode) {
             searchParams.regionCode = regionCode;
+          }
+
+          if (videoCategoryId) {
+            searchParams.videoCategoryId = videoCategoryId;
           }
 
           const response = await this.trackCost(
@@ -320,8 +326,7 @@ export class YoutubeService {
           // Log the failure but don't crash the entire operation
           if (outcome.reason instanceof AppError) throw outcome.reason;
           console.error(
-            "A batch in batchFetchChannelStatistics failed:",
-            outcome.reason
+            `A batch in batchFetchChannelStatistics failed: ${getSafeErrorMessage(outcome.reason)}`
           );
         }
       }
@@ -534,8 +539,7 @@ export class YoutubeService {
           } else {
             if (outcome.reason instanceof AppError) throw outcome.reason;
             console.error(
-              "A video details batch in getChannelTopVideos failed:",
-              outcome.reason
+              `A video details batch in getChannelTopVideos failed: ${getSafeErrorMessage(outcome.reason)}`
             );
           }
         }
@@ -612,49 +616,68 @@ export class YoutubeService {
     const operation = async (): Promise<LeanTrendingVideo[]> => {
       try {
         const { regionCode = "US", categoryId, maxResults = 10 } = options;
+        const targetResults = Math.min(maxResults, this.ABSOLUTE_MAX_RESULTS);
+        const videos: youtube_v3.Schema$Video[] = [];
+        let nextPageToken: string | undefined;
 
-        const params: youtube_v3.Params$Resource$Videos$List = {
-          part: ["snippet", "statistics", "contentDetails"],
-          chart: "mostPopular",
-          regionCode: regionCode,
-          maxResults: maxResults,
-        };
+        while (videos.length < targetResults) {
+          const params: youtube_v3.Params$Resource$Videos$List = {
+            part: ["snippet", "statistics", "contentDetails"],
+            chart: "mostPopular",
+            regionCode: regionCode,
+            maxResults: Math.min(
+              this.MAX_RESULTS_PER_PAGE,
+              targetResults - videos.length
+            ),
+          };
 
-        if (categoryId) {
-          params.videoCategoryId = categoryId;
+          if (categoryId) {
+            params.videoCategoryId = categoryId;
+          }
+          if (nextPageToken) {
+            params.pageToken = nextPageToken;
+          }
+
+          const response = await this.trackCost(
+            () => this.youtube.videos.list(params),
+            API_COSTS["videos.list"]
+          );
+          const items = response.data.items;
+          if (!items?.length) {
+            break;
+          }
+
+          videos.push(...items);
+          nextPageToken = response.data.nextPageToken || undefined;
+          if (!nextPageToken) {
+            break;
+          }
         }
 
-        const response = await this.trackCost(
-          () => this.youtube.videos.list(params),
-          API_COSTS["videos.list"]
-        );
+        return videos.slice(0, targetResults).map((video) => {
+          const viewCount = parseYouTubeNumber(video.statistics?.viewCount);
+          const likeCount = parseYouTubeNumber(video.statistics?.likeCount);
+          const commentCount = parseYouTubeNumber(
+            video.statistics?.commentCount
+          );
 
-        return (
-          response.data.items?.map((video) => {
-            const viewCount = parseYouTubeNumber(video.statistics?.viewCount);
-            const likeCount = parseYouTubeNumber(video.statistics?.likeCount);
-            const commentCount = parseYouTubeNumber(
-              video.statistics?.commentCount
-            );
-
-            return {
-              id: video.id,
-              title: video.snippet?.title,
-              channelId: video.snippet?.channelId,
-              channelTitle: video.snippet?.channelTitle,
-              publishedAt: video.snippet?.publishedAt,
-              duration: video.contentDetails?.duration,
-              viewCount: viewCount,
-              likeCount: likeCount,
-              commentCount: commentCount,
-              likeToViewRatio: calculateLikeToViewRatio(viewCount, likeCount),
-              commentToViewRatio: calculateCommentToViewRatio(
-                viewCount,
-                commentCount
-              ),
-            };
-          }) || []
-        );
+          return {
+            id: video.id,
+            title: video.snippet?.title,
+            channelId: video.snippet?.channelId,
+            channelTitle: video.snippet?.channelTitle,
+            publishedAt: video.snippet?.publishedAt,
+            duration: video.contentDetails?.duration,
+            viewCount: viewCount,
+            likeCount: likeCount,
+            commentCount: commentCount,
+            likeToViewRatio: calculateLikeToViewRatio(viewCount, likeCount),
+            commentToViewRatio: calculateCommentToViewRatio(
+              viewCount,
+              commentCount
+            ),
+          };
+        });
       } catch (error) {
         if (error instanceof AppError) throw error;
         throw new YouTubeApiError(

@@ -188,6 +188,19 @@ describe("YoutubeService - searchVideos", () => {
     expect(mockSearchList).toHaveBeenCalledTimes(absoluteMaxResults / 50);
   });
 
+  it("should pass videoCategoryId to the YouTube API", async () => {
+    mockSearchList.mockResolvedValueOnce({ data: { items: [] } });
+
+    await videoManagement.searchVideos({
+      query: "category test",
+      videoCategoryId: "10",
+    });
+
+    expect(mockSearchList).toHaveBeenCalledWith(
+      expect.objectContaining({ videoCategoryId: "10" })
+    );
+  });
+
   it("should throw an error if youtube.search.list fails", async () => {
     const query = "error test";
     const errorMessage = "API Error";

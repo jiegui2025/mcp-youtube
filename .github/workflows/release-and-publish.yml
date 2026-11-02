@@ -44,11 +44,23 @@ jobs:
 
       - name: Bump version in package.json
         id: bump_version # Give step an ID to access its outputs if needed later
+        env:
+          VERSION_TYPE: ${{ github.event.inputs.version_type }}
         run: |
-          echo "Input for version_type: ${{ github.event.inputs.version_type }}"
+          echo "Input for version_type: $VERSION_TYPE"
+          case "$VERSION_TYPE" in
+            patch|minor|major) ;;
+            *)
+              if [[ ! "$VERSION_TYPE" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+                echo "Invalid version_type: expected patch, minor, major, or a semantic version" >&2
+                exit 1
+              fi
+              ;;
+          esac
+
           # npm version updates package.json & package-lock.json.
           # --no-git-tag-version prevents npm from creating a git tag here; we do it explicitly later.
-          VERSION_OUTPUT=$(npm version ${{ github.event.inputs.version_type }} --no-git-tag-version)
+          VERSION_OUTPUT=$(npm version "$VERSION_TYPE" --no-git-tag-version)
 
           # Extract version number correctly (npm version might output 'vX.Y.Z' or 'X.Y.Z')
           if [[ "$VERSION_OUTPUT" == "v"* ]]; then
@@ -92,9 +104,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }} # Use PAT for reliable release creation & note generation
 
       - name: Publish to NPM
-        run: npm publish --tag ${{ github.event.inputs.dist_tag }} # Uses default 'latest' if not provided
         env:
+          DIST_TAG: ${{ github.event.inputs.dist_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          DIST_TAG="${DIST_TAG:-latest}" # Uses default 'latest' if not provided
+          if [[ ! "$DIST_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Invalid dist_tag: use only letters, numbers, dots, underscores, and hyphens" >&2
+            exit 1
+          fi
+          npm publish --tag "$DIST_TAG"
 
       - name: Install MCP Publisher
         run: |

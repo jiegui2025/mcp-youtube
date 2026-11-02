@@ -82,6 +82,16 @@ describe("GetChannelStatisticsTool", () => {
     expect(parsedContent).toEqual([mockStatResult1, mockStatResult2]);
   });
 
+  it("should reject oversized channel ID batches", async () => {
+    const result = await tool.execute({
+      channelIds: Array.from({ length: 51 }, (_, index) => `UC${index}`),
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("cannot contain more than 50");
+    expect(mockYoutubeService.getChannelStatistics).not.toHaveBeenCalled();
+  });
+
   it("should return a validation error if channelIds array is empty", async () => {
     const params = { channelIds: [] };
 
